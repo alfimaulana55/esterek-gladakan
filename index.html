@@ -3,8 +3,7 @@
       versi 12 sudah fix edit,mutasi,hapus sesuai id (checkpoint)
       versi 13 menambah offline mode mhtml
       versi 14 minor
-      versi 15 navigasi keyboard Enter (mutasi dan login)
-      versi 16 peta kamar floating pada arsip MHTML (tanpa JavaScript)
+      versi 15 UX: autofocus Pindah Kamar (Mutasi), Enter untuk Mutasi / Edit / Login
       database:
       untuk spreadsheet check point nya sebelum GANTI DATABASE 19 September, 21.09       
       -->
@@ -37,6 +36,11 @@
       0% { background-color: rgba(99, 102, 241, 0.4); transform: scale(1.02); }
       50% { background-color: rgba(99, 102, 241, 0.2); }
       100% { background-color: transparent; transform: scale(1); }
+    }
+
+    /* UX: sorotan tombol SIMPAN di modal Edit setelah Enter pertama */
+    .enter-ready {
+      box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.55), 0 8px 18px rgba(49, 46, 129, 0.35);
     }
   </style>
 </head>
@@ -170,171 +174,6 @@
         <div class="grid grid-cols-2 bg-gray-200 p-1 rounded-xl text-center text-xs font-bold">
           <button id="tab-btn-pindah" onclick="switchRiwayatTab('pindah')" class="py-2 rounded-lg bg-white shadow text-indigo-900 transition">PINDAH BLOK</button>
           <button id="tab-btn-keluar" onclick="switchRiwayatTab('keluar')" class="py-2 rounded-lg text-gray-500 hover:text-indigo-900 transition">WBP KELUAR</button>
-        </div>
-
-        <div class="flex items-center gap-2 bg-white p-2 rounded-xl shadow-sm border">
-          <i class="fa-regular fa-calendar-days text-indigo-900 pl-2"></i>
-          <input type="date" id="riwayat-date-filter" onchange="renderRiwayatList()" class="text-xs w-full bg-transparent outline-none">
-        </div>
-
-        <div id="riwayat-list-container" class="space-y-2"></div>
-
-        <button onclick="loadMoreRiwayat()" class="w-full py-2 bg-indigo-50 border border-indigo-200 text-indigo-900 text-xs font-bold rounded-xl shadow-sm hover:bg-indigo-100 transition">
-          MUAT LEBIH BANYAK
-        </button>
-      </section>
-
-    </main>
-
-    <!-- POIN 3: TOMBOL PETA KAMAR -->
-    <button id="fab-map" onclick="handleOpenMapButton()" class="fixed bottom-20 right-[calc(50%-180px)] sm:right-[calc(50%-200px)] z-20 w-12 h-12 bg-indigo-900 text-white rounded-full shadow-lg flex items-center justify-center hover:scale-105 transition" title="Buka Peta Kamar">
-      <i class="fa-solid fa-map-location-dot text-lg"></i>
-    </button>
-
-    <!-- BOTTOM NAVIGATION BAR -->
-    <nav class="fixed bottom-0 w-full max-w-md bg-white border-t border-gray-200 flex justify-around py-2 z-30 shadow-lg text-center">
-      <button onclick="handleNavHomeClick()" id="nav-home" class="flex flex-col items-center text-indigo-900 font-bold text-[10px]">
-        <i class="fa-solid fa-house text-lg mb-0.5"></i>
-        <span>Home</span>
-      </button>
-      <button onclick="switchView('add')" id="nav-add" class="flex flex-col items-center text-gray-400 font-medium text-[10px]">
-        <i class="fa-solid fa-user-plus text-lg mb-0.5"></i>
-        <span>Tambah WBP</span>
-      </button>
-      <button onclick="switchView('riwayat')" id="nav-riwayat" class="flex flex-col items-center text-gray-400 font-medium text-[10px]">
-        <i class="fa-solid fa-clock-rotate-left text-lg mb-0.5"></i>
-        <span>Riwayat</span>
-      </button>
-    </nav>
-
-    <!-- ==================== MODALS & POPUPS ==================== -->
-
-    <!-- MODAL LOADING OVERLAY -->
-    <div id="modal-loading" class="app-modal hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-      <div class="bg-white rounded-2xl p-6 shadow-2xl flex flex-col items-center gap-3">
-        <i class="fa-solid fa-spinner fa-spin text-4xl text-indigo-900"></i>
-        <p id="loading-text" class="text-xs font-bold text-gray-800">Sedang memproses...</p>
-      </div>
-    </div>
-
-    <!-- PETA KAMAR DINAMIS -->
-    <div id="modal-map" class="app-modal hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div class="bg-white rounded-2xl w-full max-w-sm max-h-[85vh] flex flex-col p-4 shadow-xl modal-scrollable">
-        <div class="flex justify-between items-center border-b pb-2 mb-3 flex-shrink-0">
-          <div>
-            <h3 class="font-bold text-xs text-gray-800">Peta Kamar Gladakan</h3>
-            <p class="text-[9px] text-gray-400">Pilih kamar untuk langsung menuju data WBP</p>
-          </div>
-          <button onclick="closeModal('modal-map')" class="text-gray-400 hover:text-black text-sm p-1"><i class="fa-solid fa-xmark"></i></button>
-        </div>
-        <div id="map-grid-container" class="flex-1 overflow-y-auto space-y-4 pr-1 modal-scrollable"></div>
-      </div>
-    </div>
-
-    <!-- DETAIL WBP PROFIL -->
-    <div id="modal-detail" class="app-modal hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div class="bg-white rounded-2xl w-full max-w-xs max-h-[85vh] overflow-y-auto p-5 space-y-4 shadow-xl relative modal-scrollable">
-        <button onclick="closeModal('modal-detail')" class="absolute top-4 right-4 text-gray-400 hover:text-black"><i class="fa-solid fa-xmark text-lg"></i></button>
-        
-        <div class="flex justify-between items-center pr-6">
-          <p class="text-[10px] font-bold text-gray-400 tracking-wider">PROFIL WBP</p>
-          <span id="detail-badge-id" class="text-[9px] bg-indigo-100 text-indigo-900 font-bold px-2 py-0.5 rounded-full">ID: -</span>
-        </div>
-        
-        <div class="flex flex-col items-center text-center space-y-2">
-          <img id="detail-foto" class="w-24 h-32 object-cover rounded-lg border shadow-sm bg-gray-100" src="" alt="Foto">
-          <div>
-            <h3 id="detail-nama" class="font-bold text-sm text-gray-900 uppercase"></h3>
-            <p id="detail-no-reg" class="text-[10px] text-gray-500 font-semibold"></p>
-          </div>
-        </div>
-
-        <div class="space-y-2 border-t pt-3 text-xs">
-          <div>
-            <span class="text-[10px] text-gray-400 font-bold block uppercase">PIDANA</span>
-            <span id="detail-pidana" class="font-bold text-gray-800"></span>
-          </div>
-          <div>
-            <span class="text-[10px] text-gray-400 font-bold block uppercase">PUTUSAN</span>
-            <span id="detail-putusan" class="font-bold text-gray-800"></span>
-          </div>
-          <div>
-            <span class="text-[10px] text-gray-400 font-bold block uppercase">TGL EKSPIRASI</span>
-            <span id="detail-ekspirasi" class="font-bold text-gray-800"></span>
-          </div>
-          <div>
-            <span class="text-[10px] text-gray-400 font-bold block uppercase">TGL MASUK UPT</span>
-            <span id="detail-tgl-masuk-upt" class="font-bold text-gray-800"></span>
-          </div>
-          <div>
-            <span class="text-[10px] text-gray-400 font-bold block uppercase">TGL PENEMPATAN</span>
-            <span id="detail-tgl-masuk" class="font-bold text-gray-800"></span>
-            <span id="detail-durasi-blok" class="text-[10px] text-indigo-600 font-bold block"></span>
-          </div>
-
-          <div class="pt-2">
-            <span class="text-[10px] text-gray-400 font-bold block uppercase mb-1">RIWAYAT PENEMPATAN / MUTASI</span>
-            <div id="detail-riwayat-mutasi-list" class="space-y-1.5 max-h-32 overflow-y-auto pr-1 custom-scrollbar modal-scrollable"></div>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-3 gap-2 border-t pt-3">
-          <button onclick="openEditModalFromDetail()" class="py-2 bg-gray-200 text-gray-800 text-[10px] font-bold rounded-lg hover:bg-gray-300">EDIT</button>
-          <button onclick="openMutasiModal()" class="py-2 bg-indigo-900 text-white text-[10px] font-bold rounded-lg hover:bg-indigo-800">MUTASI</button>
-          <button onclick="openHapusModal()" class="py-2 bg-red-600 text-white text-[10px] font-bold rounded-lg hover:bg-red-700">HAPUS</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- MODAL EDIT DATA WBP -->
-    <div id="modal-edit" class="app-modal hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div class="bg-white rounded-2xl w-full max-w-sm max-h-[85vh] overflow-y-auto p-4 shadow-xl relative modal-scrollable">
-        <div class="flex justify-between items-center border-b pb-2 mb-3">
-          <h3 id="edit-modal-title" class="font-bold text-xs text-gray-800">Edit Data WBP</h3>
-          <button onclick="closeModal('modal-edit')" class="text-gray-400 hover:text-black text-sm p-1"><i class="fa-solid fa-xmark"></i></button>
-        </div>
-
-        <form id="edit-modal-form" onsubmit="handleEditModalSubmit(event)" class="space-y-3">
-          <input type="hidden" id="edit-input-id">
-
-         <div>
-            <label class="block text-[10px] font-semibold text-gray-600 uppercase mb-1">Ganti Foto WBP</label>
-            
-            <!-- LABEL NATIVE (100% PASTI BUKA GALERI/KAMERA DI HP) -->
-            <label for="edit-foto-input" id="edit-drop-zone" class="block border-2 border-dashed border-indigo-300 rounded-lg p-3 text-center bg-indigo-50/70 cursor-pointer hover:bg-indigo-100 active:scale-95 transition">
-              <i class="fa-solid fa-camera text-2xl text-indigo-600 mb-1"></i>
-              <p class="text-xs text-indigo-900 font-bold">Pilih dari Galeri / Kamera HP</p>
-              <p class="text-[10px] text-gray-500">Sentuh kotak ini untuk memilih foto</p>
-              <input type="file" id="edit-foto-input" accept="image/*" class="sr-only" onchange="handleEditFileSelect(event)" onclick="this.value=null;">
-            </label>
-
-            <!-- TOMBOL KHUSUS TEMPEL (PASTE) UNTUK PENGGUNA HP -->
-            <div class="mt-1.5 flex gap-2">
-              <button type="button" onclick="pasteImageFromClipboard('edit')" class="w-full py-1.5 px-2 bg-indigo-50 border border-indigo-200 text-indigo-800 text-[10px] font-bold rounded-lg flex items-center justify-center gap-1.5 active:bg-indigo-200">
-                <i class="fa-solid fa-paste"></i>
-                <span>Tempel (Paste) Foto dari Clipboard HP</span>
-              </button>
-            </div>
-
-            <!-- PREVIEW FOTO & STATUS -->
-            <div id="edit-photo-preview-container" class="mt-2 flex flex-col items-center justify-center">
-              <img id="edit-photo-preview" class="w-20 h-28 object-cover rounded shadow border bg-gray-100" alt="Preview">
-              <span id="edit-photo-status" class="text-[9px] text-green-600 font-bold mt-1 hidden">✓ Foto Baru Siap Diunggah</span>
-            </div>
-          </div>
-
-          <div>
-            <label class="block text-[10px] font-semibold text-gray-600 mb-0.5">NOMOR REGISTRASI</label>
-            <input type="text" id="edit-input-no-reg" class="w-full text-xs p-2 border rounded-lg outline-none uppercase">
-          </div>
-
-          <div>
-            <label class="block text-[10px] font-semibold text-gray-600 mb-0.5">NAMA LENGKAP</label>
-            <input type="text" id="edit-input-nama" class="w-full text-xs p-2 border rounded-lg outline-none uppercase">
-          </div>
-
-          <div class="relative">
-            <label class="block text-[10px] font-bold text-indigo-900 mb-0.5">BLOK / KAMAR <span class="text-red-50R</button>
         </div>
 
         <div class="flex items-center gap-2 bg-white p-2 rounded-xl shadow-sm border">
@@ -794,6 +633,56 @@
       setupDragDropAndPaste();
       bootstrapApp();
     });
+
+    // ===== UX: PINTASAN TOMBOL ENTER (Mutasi, Edit, Login) =====
+    // Hanya menambah perilaku Enter pada input tertentu. Fungsi lama tidak diubah.
+    function isEnterKey(e) {
+      return !e.isComposing && (e.key === "Enter" || e.keyCode === 13);
+    }
+
+    function resetEditSimpanHighlight() {
+      document.getElementById("btn-save-edit-modal").classList.remove("enter-ready");
+    }
+
+    function setupEnterShortcuts() {
+      // 1. MUTASI: Enter di "Pindah Kamar" -> fokus ke "Alasan"; Enter di "Alasan" -> SIMPAN
+      var mutasiKamar = document.getElementById("mutasi-kamar");
+      var mutasiAlasan = document.getElementById("mutasi-alasan");
+      mutasiKamar.addEventListener("keydown", function(e) {
+        if (!isEnterKey(e)) return;
+        e.preventDefault();
+        mutasiAlasan.focus();
+      });
+      mutasiAlasan.addEventListener("keydown", function(e) {
+        if (!isEnterKey(e)) return;
+        e.preventDefault();
+        executeMutasi();
+      });
+
+      // 2. EDIT: Enter pertama di kolom input -> sorot & fokus tombol SIMPAN.
+      //    Enter kedua (saat tombol SIMPAN fokus) -> browser menjalankan klik SIMPAN secara native.
+      var editForm = document.getElementById("edit-modal-form");
+      var btnSimpanEdit = document.getElementById("btn-save-edit-modal");
+      editForm.addEventListener("keydown", function(e) {
+        if (!isEnterKey(e)) return;
+        var t = e.target;
+        if (t.tagName !== "INPUT" || t.type === "file") return;
+        e.preventDefault(); // cegah submit langsung
+        btnSimpanEdit.classList.add("enter-ready");
+        btnSimpanEdit.focus();
+      });
+
+      // 3. LOGIN: Enter di kolom password -> jalankan LOGIN (diabaikan jika sedang memproses)
+      document.getElementById("login-password").addEventListener("keydown", function(e) {
+        if (!isEnterKey(e)) return;
+        e.preventDefault();
+        if (document.getElementById("modal-loading").classList.contains("hidden")) {
+          handleLoginSubmit();
+        }
+      });
+    }
+
+    window.addEventListener("DOMContentLoaded", setupEnterShortcuts);
 
     function toggleOnlineOffline() {
       isOfflineMode = !isOfflineMode;
@@ -1767,6 +1656,7 @@
         document.getElementById("edit-photo-preview-container").classList.add("hidden");
       }
 
+      resetEditSimpanHighlight(); // UX: hapus sorotan Simpan dari sesi sebelumnya
       openModal("modal-edit");
     }
 
@@ -1827,6 +1717,7 @@
       document.getElementById("mutasi-kamar").value = "";
       document.getElementById("mutasi-alasan").value = "";
       openModal("modal-mutasi");
+      document.getElementById("mutasi-kamar").focus(); // UX: autofocus ke Pindah Kamar
     }
 
     function executeMutasi() {
