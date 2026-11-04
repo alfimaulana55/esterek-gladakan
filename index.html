@@ -4,6 +4,7 @@
       versi 13 menambah offline mode mhtml
       versi 14 minor
       versi 15 UX: autofocus Pindah Kamar (Mutasi), Enter untuk Mutasi / Edit / Login
+      versi 16 PWA (manifest, service worker, ikon) + peta kamar di file MHTML
       database:
       untuk spreadsheet check point nya sebelum GANTI DATABASE 19 September, 21.09       
       -->
@@ -14,6 +15,24 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes">
   <title>E-Sterek Gladakan</title>
+  <!-- PWA: manifest, ikon, dan service worker (bisa di-install & bisa dibuka offline) -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#312e81">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="E-Sterek">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", function() {
+        navigator.serviceWorker.register("sw.js").catch(function(err) {
+          console.warn("Service worker gagal didaftarkan:", err);
+        });
+      });
+    }
+  </script>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
@@ -2216,6 +2235,111 @@
   });
 }
 
+    // ===== PETA KAMAR DI DALAM FILE MHTML (tanpa JavaScript, memakai <details>/<summary>) =====
+    // Viewer MHTML tidak menjalankan script dan tidak mengizinkan lompat/aktivasi label, tetapi
+    // <details>/<summary> tetap berfungsi di Chrome/Edge tanpa internet.
+    //   - Tombol peta (pojok kanan bawah) : ketuk untuk buka, ketuk lagi (ikon x) untuk tutup
+    //   - Ketuk kamar                      : tampilkan daftar WBP di kamar tersebut
+    function escMhtml(s) {
+      return String(s == null ? "" : s)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+    function buildMhtmlRoomList(list) {
+      var h = '<div class="esp-list">';
+      list.forEach(function(w) {
+        h += '<div class="esp-card">' +
+          '<div style="display:flex;justify-content:space-between;font-weight:bold;color:#0f172a;"><span>' + escMhtml(w.nama || "TANPA NAMA") + '</span>' +
+          '<span style="color:#94a3b8;font-size:9px;">#' + escMhtml(w.id) + '</span></div>' +
+          '<div style="color:#64748b;">No. Reg: ' + escMhtml(w.nomorRegistrasi || "-") + '</div>' +
+          '<div style="color:#64748b;">Pidana: ' + escMhtml(w.pidana || "-") + '</div>' +
+          '<div style="color:#64748b;">Putusan: ' + escMhtml(w.putusan || "-") + '</div>' +
+          '<div style="color:#312e81;font-weight:bold;">Ekspirasi: ' + escMhtml(w.tglEkspirasi || "-") + '</div>' +
+          '</div>';
+      });
+      return h + '</div>';
+    }
+    function buildMhtmlMapHtml(masterList, wbpList) {
+      var byRoom = {};
+      wbpList.forEach(function(w) {
+        var k = String(w.blok || "").toUpperCase();
+        if (!byRoom[k]) byRoom[k] = [];
+        byRoom[k].push(w);
+      });
+
+      var blocks = {};
+      var blockOrder = [];
+      masterList.forEach(function(m) {
+        var b = m.namaBlok || "Lainnya";
+        if (!blocks[b]) { blocks[b] = []; blockOrder.push(b); }
+        blocks[b].push(m);
+      });
+
+      var css =
+        '.esp-fab{position:fixed;right:16px;bottom:16px;z-index:1001;width:48px;height:48px;border-radius:50%;background:#312e81;color:#ffffff;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(0,0,0,.3);cursor:pointer;list-style:none;}' +
+        '.esp-fab::-webkit-details-marker{display:none;}' +
+        '.esp-fab .esp-x{display:none;}' +
+        '.esp-wrap[open] .esp-fab .esp-x{display:block;}' +
+        '.esp-wrap[open] .esp-fab .esp-map{display:none;}' +
+        '.esp-overlay{position:fixed;top:0;right:0;bottom:0;left:0;z-index:1000;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;}' +
+        '.esp-box{background:#ffffff;border-radius:16px;width:100%;max-width:360px;max-height:85vh;display:flex;flex-direction:column;padding:16px;box-sizing:border-box;font-family:sans-serif;color:#1e293b;box-shadow:0 20px 50px rgba(0,0,0,.3);}' +
+        '.esp-scroll{overflow-y:auto;}' +
+        '.esp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}' +
+        '.esp-tile{border-radius:8px;background:#eef2ff;border:1px solid #c7d2fe;}' +
+        '.esp-tile[open]{grid-column:1 / -1;}' +
+        '.esp-tile>summary{display:block;list-style:none;padding:8px;text-align:center;cursor:pointer;}' +
+        '.esp-tile>summary::-webkit-details-marker{display:none;}' +
+        '.esp-kosong{border-radius:8px;padding:8px;text-align:center;background:#f8fafc;border:1px solid #e2e8f0;opacity:.55;}' +
+        '.esp-list{padding:4px 2px 2px;text-align:left;}' +
+        '.esp-card{border:1px solid #e2e8f0;border-radius:8px;padding:8px;margin-bottom:6px;font-size:11px;line-height:1.45;background:#ffffff;}';
+
+      var html = '<style>' + css + '</style>';
+
+      html += '<details class="esp-wrap" id="esp-peta">';
+      html += '<summary class="esp-fab" title="Buka / tutup Peta Kamar">' +
+        '<svg class="esp-map" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14"/><path d="M15 6v14"/></svg>' +
+        '<svg class="esp-x" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>' +
+        '</summary>';
+
+      html += '<div class="esp-overlay"><div class="esp-box">';
+      html += '<div style="border-bottom:1px solid #e2e8f0;padding-bottom:8px;margin-bottom:12px;flex-shrink:0;">' +
+        '<div style="font-weight:bold;font-size:13px;">Peta Kamar Gladakan</div>' +
+        '<div style="font-size:10px;color:#94a3b8;">Ketuk kamar untuk melihat WBP di dalamnya. Ketuk ikon x di pojok kanan bawah untuk menutup.</div>' +
+        '</div>';
+      html += '<div class="esp-scroll">';
+
+      blockOrder.forEach(function(b) {
+        html += '<div style="margin-bottom:14px;">' +
+          '<div style="font-weight:bold;font-size:12px;color:#312e81;border-bottom:1px solid #e2e8f0;padding-bottom:4px;margin-bottom:8px;">' + escMhtml(b) + '</div>' +
+          '<div class="esp-grid">';
+
+        blocks[b].slice().sort(function(x, y) {
+          return naturalSort(String(x.kodeKamar), String(y.kodeKamar));
+        }).forEach(function(m) {
+          var code = String(m.kodeKamar || "").toUpperCase();
+          var list = byRoom[code] || [];
+          var n = list.length;
+          var ket = (m.keteranganKamar && String(m.keteranganKamar).trim() !== "")
+            ? '<span style="display:block;font-size:9px;color:#4338ca;line-height:1.2;">(' + escMhtml(m.keteranganKamar) + ')</span>'
+            : '';
+          var inner = '<span style="display:block;font-weight:bold;font-size:12px;color:#312e81;">' + escMhtml(code) + '</span>' + ket +
+            '<span style="display:block;font-size:9px;color:#64748b;font-weight:600;margin-top:4px;">' + n + ' Orang</span>';
+
+          if (n > 0) {
+            html += '<details class="esp-tile"><summary>' + inner + '</summary>' + buildMhtmlRoomList(list) + '</details>';
+          } else {
+            html += '<div class="esp-kosong">' + inner + '</div>';
+          }
+        });
+
+        html += '</div></div>';
+      });
+
+      html += '</div></div></div>';   // .esp-scroll, .esp-box, .esp-overlay
+      html += '</details>';           // .esp-wrap
+      return html;
+    }
+
     // GENERATOR ARSIP FILE MHTML LENGKAP BESERTA FOTO
  async function executeDownloadMHTML() {
 
@@ -2422,6 +2546,7 @@
 
 
     bodyHtml += '<div style="text-align:center;font-size:10px;color:#94a3b8;padding:15px 0;">Diekspor secara otomatis oleh Sistem E-Sterek Gladakan</div>';
+    bodyHtml += buildMhtmlMapHtml(APP_DATA.master_kamar || [], dataWbp);
 
     bodyHtml += '</div>';
 
